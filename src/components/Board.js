@@ -18,9 +18,9 @@ import {
   Divider,
   FormHelperText,
 } from "@mui/material";
-import backGroung from "./backGroung.png";
 import { useAtom } from "jotai";
 import { MyRow, Row } from "./data/Atom";
+import { useNavigate } from "react-router-dom";
 
 let data = [
   { no: 1, title: "장기웅", user: "장기웅", description: "", button: true },
@@ -48,17 +48,43 @@ const nullFunc = (msg) => {
 };
 
 export const Board = () => {
+  const navigate = useNavigate();
   const [row, setRow] = useAtom(Row);
   const [open, setOpen] = useState(false);
   const [myRow, setMyRow] = useAtom(MyRow);
+  const [delAlert, setDelAlert] = useState(false);
+  const [refresh, setRefresh] = useState(false);
+  const [upd, setUpd] = useState(false);
+  const [delItem, setDelItem] = useState();
+  const [updIdx, setUpdIdx] = useState();
   const [addVal, setAddVal] = useState({
+    no: 0,
     title: "",
-    user: "",
+    user: localStorage.getItem("loginUser")
+      ? JSON.parse(localStorage.getItem("loginUser")).userName
+      : "Guest",
     description: "",
   });
   const [validation, setValidation] = useState(defaultValidation);
   const row1 = localStorage.getItem("row");
-  const myId = localStorage.getItem("user");
+  const myId = localStorage.getItem("loginUser")
+    ? JSON.parse(localStorage.getItem("loginUser")).userName
+    : "";
+
+  const onClickCell = (data) => {
+    navigate("/detail?idx=" + data);
+  };
+
+  const onClickDel = (data) => {
+    const delRow = JSON.parse(row1).filter((e) => e.no !== data);
+    localStorage.removeItem("row");
+    localStorage.setItem("row", JSON.stringify(delRow));
+    setRefresh(!refresh);
+  };
+
+  useEffect(() => {
+    setValidation(defaultValidation);
+  }, [open]);
 
   useEffect(() => {
     if (localStorage.getItem("row")) {
@@ -67,31 +93,46 @@ export const Board = () => {
       localStorage.setItem("row", JSON.stringify(data));
       setRow(data);
     }
-  }, []);
+  }, [refresh]);
 
   useEffect(() => {
     if (myRow) {
       if (localStorage.getItem("row")) {
-        setRow(JSON.parse(row1).filter((e) => e.user !== myId));
+        setRow(JSON.parse(row1).filter((e) => e.user === myId));
       } else {
         localStorage.setItem("row", JSON.stringify(data));
         setRow(JSON.parse(row1).filter((e) => e.user !== myId));
       }
+    } else {
+      setRow(JSON.parse(row1));
     }
   }, [myRow]);
 
   const onClickRow = (type, idx) => {
-    if (JSON.parse(row1)) {
-      let rowLo = JSON.parse(row1);
-      localStorage.removeItem("row");
-      type === "ADD"
-        ? rowLo.push({
+    const valid = {
+      titleNull: addVal.title === "",
+      userNull: addVal.user === "",
+      descriptionNull: addVal.description === "",
+    };
+
+    setValidation(valid);
+
+    if (!Object.values(valid).includes(true)) {
+      if (JSON.parse(row1)) {
+        let rowLo = JSON.parse(row1);
+        localStorage.removeItem("row");
+        if (type === "ADD") {
+          rowLo.push({
             no: Number(rowLo[rowLo.length - 1].no) + 1,
             title: addVal.title,
             user: addVal.user,
             description: addVal.description,
-          })
-        : rowLo.map((item) => {
+          });
+          localStorage.removeItem("row");
+          localStorage.setItem("row", JSON.stringify(rowLo));
+          setRow(rowLo);
+        } else {
+          const updRow = rowLo.map((item) => {
             return item.no === idx
               ? {
                   no: item.no,
@@ -101,14 +142,56 @@ export const Board = () => {
                 }
               : item;
           });
-      localStorage.setItem("row", JSON.stringify(rowLo));
-      setRow(rowLo);
-      setOpen(false);
-      alert(type === "ADD" ? "글이 저장되었습니다." : "글이 수정되었습니다.");
+          console.log(updRow);
+          localStorage.removeItem("row");
+          localStorage.setItem("row", JSON.stringify(updRow));
+          setRow(updRow);
+          setUpd();
+        }
+        setOpen(false);
+        alert(type === "ADD" ? "글이 저장되었습니다." : "글이 수정되었습니다.");
+      }
     }
   };
+
   return (
     <>
+      {delAlert && (
+        <Dialog
+          open={delAlert}
+          PaperProps={{
+            style: {
+              width: "500px",
+              overflowX: "hidden",
+            },
+          }}
+        >
+          <DialogContent>
+            <Box>
+              <Typography>해당글을 삭제 하시겠습니까?</Typography>
+            </Box>
+            <Box sx={{ float: "right", marginTop: "30px" }}>
+              <Button
+                onClick={() => {
+                  onClickDel(delItem);
+                  setDelAlert(false);
+                  setDelItem();
+                }}
+              >
+                네
+              </Button>
+              <Button
+                onClick={() => {
+                  setDelAlert(false);
+                  setDelItem();
+                }}
+              >
+                아니요
+              </Button>
+            </Box>
+          </DialogContent>
+        </Dialog>
+      )}
       {open && (
         <Dialog
           open={open}
@@ -136,16 +219,17 @@ export const Board = () => {
               onChange={(e) => {
                 setAddVal({ ...addVal, title: e.target.value });
               }}
+              error={validation.titleNull}
               placeholder="제목"
               onBlur={(e) => {
-                if ((e.target.value = "")) {
-                  setValidation({ ...validation, title: true });
+                if (e.target.value) {
+                  setValidation({ ...validation, titleNull: false });
                 } else {
-                  setValidation({ ...validation, title: false });
+                  setValidation({ ...validation, titleNull: true });
                 }
               }}
             />
-            {validation.title && (
+            {validation.titleNull && (
               <FormHelperText sx={{ color: "red" }}>
                 {nullFunc("제목을")}
               </FormHelperText>
@@ -160,15 +244,17 @@ export const Board = () => {
               onChange={(e) => {
                 setAddVal({ ...addVal, user: e.target.value });
               }}
+              readOnly
+              error={validation.userNull}
               onBlur={(e) => {
-                if ((e.target.value = "")) {
-                  setValidation({ ...validation, user: true });
+                if (e.target.value) {
+                  setValidation({ ...validation, userNull: false });
                 } else {
-                  setValidation({ ...validation, user: false });
+                  setValidation({ ...validation, userNull: true });
                 }
               }}
             />
-            {validation.user && (
+            {validation.userNull && (
               <FormHelperText sx={{ color: "red" }}>
                 {nullFunc("작성자명을")}
               </FormHelperText>
@@ -181,19 +267,20 @@ export const Board = () => {
               sx={style.diInput}
               placeholder="Description"
               multiline
+              error={validation.descriptionNull}
               minRows={5}
               onChange={(e) => {
                 setAddVal({ ...addVal, description: e.target.value });
               }}
               onBlur={(e) => {
-                if ((e.target.value = "")) {
-                  setValidation({ ...validation, description: true });
+                if (e.target.value) {
+                  setValidation({ ...validation, descriptionNull: false });
                 } else {
-                  setValidation({ ...validation, description: false });
+                  setValidation({ ...validation, descriptionNull: true });
                 }
               }}
             />
-            {validation.description && (
+            {validation.descriptionNull && (
               <FormHelperText sx={{ color: "red" }}>
                 {nullFunc("내용을")}
               </FormHelperText>
@@ -231,7 +318,11 @@ export const Board = () => {
                 marginRight: "15%",
               }}
               onClick={() => {
-                onClickRow("ADD");
+                if (upd) {
+                  onClickRow("UPD", updIdx);
+                } else {
+                  onClickRow("ADD");
+                }
               }}
             >
               등록
@@ -239,20 +330,7 @@ export const Board = () => {
           </Box>
         </Dialog>
       )}
-      <Box>
-        <Box
-          component="img"
-          alt=""
-          sx={{
-            backgroundImage: `url(${backGroung})`,
-            width: "100%",
-            border: "0px solid",
-            aligh: "center",
-            display: "inline-block",
-            height: "250px",
-          }}
-        />
-      </Box>
+
       <Typography
         sx={{
           marginTop: "30px",
@@ -300,18 +378,27 @@ export const Board = () => {
                       <TableCell
                         sx={{ border: "1px solid #DDDDDD" }}
                         align="center"
+                        onClick={() => {
+                          onClickCell(item.no);
+                        }}
                       >
                         {item.no}
                       </TableCell>
                       <TableCell
                         sx={{ border: "1px solid #DDDDDD" }}
                         align="left"
+                        onClick={() => {
+                          onClickCell(item.no);
+                        }}
                       >
                         {item.title}
                       </TableCell>
                       <TableCell
                         sx={{ border: "1px solid #DDDDDD", width: "20%" }}
                         align="center"
+                        onClick={() => {
+                          onClickCell(item.no);
+                        }}
                       >
                         {item.user}
                       </TableCell>
@@ -327,10 +414,11 @@ export const Board = () => {
                               border: "1px solid #284AD5",
                             }}
                             onClick={() => {
-                              setOpen(false);
+                              setDelItem(item.no);
+                              setDelAlert(true);
                             }}
                           >
-                            취소
+                            삭제
                           </Button>
                           <Button
                             sx={{
@@ -345,7 +433,15 @@ export const Board = () => {
                               },
                             }}
                             onClick={() => {
+                              setAddVal({
+                                no: item.no,
+                                title: item.title,
+                                user: item.user,
+                                description: item.description,
+                              });
                               setOpen(true);
+                              setUpd(true);
+                              setUpdIdx(item.no);
                             }}
                           >
                             수정
@@ -366,12 +462,21 @@ export const Board = () => {
             border: "1px solid #284AD5",
             marginTop: "20px",
             marginBottom: "50px",
+            marginLeft: "91%",
           }}
           onClick={() => {
             setOpen(true);
+            setAddVal({
+              no: 0,
+              title: "",
+              user: localStorage.getItem("loginUser")
+                ? JSON.parse(localStorage.getItem("loginUser")).userName
+                : "Guest",
+              description: "",
+            });
           }}
         >
-          Click
+          등록
         </Button>
       </Box>
     </>

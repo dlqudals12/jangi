@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -8,18 +8,44 @@ import {
   Select,
 } from "@mui/material";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
-import AutoAwesomeMotionIcon from "@mui/icons-material/AutoAwesomeMotion";
-import BrokenImageIcon from "@mui/icons-material/BrokenImage";
-import CampaignIcon from "@mui/icons-material/Campaign";
-import CastConnectedIcon from "@mui/icons-material/CastConnected";
 import { useAtom } from "jotai";
-import { MyRow, SearchStatus } from "./data/Atom";
-import { useNavigate } from "react-router-dom";
+import { MyRow, Row, SearchStatus } from "./data/Atom";
+import { json, useNavigate } from "react-router-dom";
+import backGroung from "./backGroung.png";
+import SearchIcon from "@mui/icons-material/Search";
+
+const user = localStorage.getItem("loginUser")
+  ? JSON.parse(localStorage.getItem("loginUser"))
+  : null;
 
 export const Header = () => {
   const navigate = useNavigate();
   const [searchFiled, setSearchFiled] = useAtom(SearchStatus);
   const [myRow, setMyRow] = useAtom(MyRow);
+  const [row, setRow] = useAtom(Row);
+  const [isLogin, setIsLogin] = useState(false);
+
+  useEffect(() => {
+    if (localStorage.getItem("loginUser")) {
+      setIsLogin(true);
+    }
+  }, []);
+
+  const onClickSearch = () => {
+    const newRow = JSON.parse(
+      localStorage.getItem("row") ? localStorage.getItem("row") : []
+    ).filter((e) => {
+      switch (searchFiled.select) {
+        case 1:
+          return e.title.includes(searchFiled.input);
+        case 2:
+          return e.user.includes(searchFiled.input);
+        default:
+          return true;
+      }
+    });
+    setRow(newRow);
+  };
 
   return (
     <>
@@ -101,9 +127,6 @@ export const Header = () => {
           <MenuItem value={2} sx={{ fontFamily: "NotoSansKRMedium" }}>
             작성자
           </MenuItem>
-          <MenuItem value={3} sx={{ fontFamily: "NotoSansKRMedium" }}>
-            작성내용
-          </MenuItem>
         </Select>
         <OutlinedInput
           container
@@ -119,20 +142,62 @@ export const Header = () => {
           onChange={(e) => {
             setSearchFiled({ ...searchFiled, input: e.target.value });
           }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              onClickSearch();
+            }
+          }}
         />
-
-        <IconButton sx={{ marginLeft: "50px" }}>
-          <AutoAwesomeMotionIcon color="secondary" />
+        <IconButton sx={{ marginLeft: "3px" }} onClick={onClickSearch}>
+          <SearchIcon sx={{ color: "white" }} />
         </IconButton>
-        <IconButton sx={{ marginLeft: "10px" }}>
-          <BrokenImageIcon color="secondary" />
-        </IconButton>
-        <IconButton sx={{ marginLeft: "10px" }}>
-          <CampaignIcon color="secondary" />
-        </IconButton>
-        <IconButton sx={{ marginLeft: "10px" }}>
-          <CastConnectedIcon color="secondary" />
-        </IconButton>
+        {isLogin ? (
+          <>
+            <Button
+              sx={{ color: "white", marginLeft: "180px" }}
+              onClick={() => {
+                localStorage.removeItem("loginUser");
+                alert("로그아웃 되었습니다.");
+                setIsLogin(false);
+              }}
+            >
+              로그아웃
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              sx={{ color: "white", marginLeft: "95px" }}
+              onClick={() => {
+                navigate("/login");
+              }}
+            >
+              로그인
+            </Button>
+            <Button
+              sx={{ color: "white", marginLeft: "15px" }}
+              onClick={() => {
+                navigate("/signup");
+              }}
+            >
+              회원가입
+            </Button>
+          </>
+        )}
+      </Box>
+      <Box>
+        <Box
+          component="img"
+          alt=""
+          sx={{
+            backgroundImage: `url(${backGroung})`,
+            width: "100%",
+            border: "0px solid",
+            aligh: "center",
+            display: "inline-block",
+            height: "250px",
+          }}
+        />
       </Box>
     </>
   );
